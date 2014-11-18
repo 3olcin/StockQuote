@@ -3,6 +3,8 @@ package com.maalouf.StockQuote;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.URL;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -30,18 +32,21 @@ public class StockQuote extends Activity {
 	Button searchButton;
 	WebView webView;
 	TextView textView;
+	Timer timer = new Timer();
 	
 	
 	final Handler loadContent = new Handler(){
 		
 		@Override
 		public void handleMessage(Message msg) {
-			//Log.d("json", (String.valueOf(msg.obj)));
-			//create json object
+		
 			try {
 				JSONObject jObject = new JSONObject(String.valueOf(msg.obj));
+				Log.i("10 SEC?", String.valueOf(msg.obj));
+
 				//webView.loadData(String.valueOf(msg.obj), "text/html", "UTF-8");
 				JSONObject jArray = jObject.getJSONObject("list");
+				Log.i("YES", jArray.toString());
 				JSONArray resources = jArray.getJSONArray("resources");
 				JSONObject resourcesObject = resources.getJSONObject(0);
 				JSONObject resource = resourcesObject.getJSONObject("resource");
@@ -56,17 +61,7 @@ public class StockQuote extends Activity {
 				String utctime = fields.getString("utctime");
 				String volume = fields.getString("volume");
 	
-				//JSONObject meta = jArray.getJSONObject("meta");
-				//String type = meta.getString("type");
-				//webView.loadData("name:<br>" + name +
-				//"<br><br>price:<br>" + price + 
-				//"<br><br>symbol:<br>" + symbol +
-				//"<br><br>TS:<br>" + ts +
-				//"<br><br>type:<br>" + type +
-				//"<br><br>utctime:<br>" + utctime +
-				//"<br><br>volume:<br>" + volume);
-				//"<br><br>volume:<br>" + volume, "text/html", "UTF-8");
-					
+				
 				textView.setText("name:\n" + name +
 						"\n\nprice:\n" + price + 
 						"\n\nsymbol:\n" + symbol +
@@ -74,8 +69,7 @@ public class StockQuote extends Activity {
 						"\n\ntype:\n" + type +
 						"\n\nutctime:\n" + utctime +
 						"\n\nvolume:\n" + volume);
-						//"<br><br>volume:<br>" + volume, "text/html", "UTF-8");
-				//Log.d("json", name);
+						
 
 			} catch (JSONException e) {
 				// TODO Auto-generated catch block
@@ -84,69 +78,77 @@ public class StockQuote extends Activity {
 		}
 	};
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-        
-        searchInput = (EditText) findViewById(R.id.searchbar); 
-        searchButton = (Button) findViewById(R.id.search);
-        //webView = (WebView) findViewById(R.id.webView);
-        textView = (TextView) findViewById(R.id.textView);
-        
-        
-        searchButton.setOnClickListener(new View.OnClickListener() {
-       
+	
+	@Override
+	protected void onCreate(Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		setContentView(R.layout.activity_main);
+
+	      searchInput = (EditText) findViewById(R.id.searchbar); 
+	        searchButton = (Button) findViewById(R.id.search);
+	        textView = (TextView) findViewById(R.id.textView);
+
+
+		searchButton.setOnClickListener(new View.OnClickListener() {
+
 			@Override
 			public void onClick(View v) {
-				
-				Thread getURL = new Thread(){
-				
-			    @Override
-				public void run(){
-			
-					if (isNetworkActive()){
-						
-						URL url = null;
-						
+
+				timer = new Timer();
+
+				timer.scheduleAtFixedRate(new TimerTask() {
+					public void run() {
+
 						try {
-							String stockSymbol = searchInput.getText().toString().toUpperCase();
-							String stockURL = "http://finance.yahoo.com/webservice/v1/symbols/" + stockSymbol + "/quote?format=json";
-							url = new URL(stockURL);
-							BufferedReader reader = new BufferedReader(
-									new InputStreamReader(
-											url.openStream()));
-							
-							String response = "";
-							String tmpResponse = "";
-							
-							tmpResponse = reader.readLine();
-							while (tmpResponse != null){
-								response = response + tmpResponse;
-								tmpResponse = reader.readLine();
+							if (isNetworkActive()) {
+
+								try {
+									String stockSymbol = searchInput.getText()
+											.toString();
+									URL url = new URL(
+											"http://finance.yahoo.com/webservice/v1/symbols/"
+													+ stockSymbol
+													+ "/quote?format=json");
+
+									try {
+
+										BufferedReader in = new BufferedReader(
+												new InputStreamReader(url
+														.openStream()));
+										String data = "";
+										String inputLine = "";
+										while ((inputLine = in.readLine()) != null)
+											data += inputLine;
+										in.close();
+
+										JSONObject jsonResponse = new JSONObject(
+												data);
+
+										Message msg = new Message();
+										msg.obj = jsonResponse;
+
+										loadContent.sendMessage(msg);
+
+									} catch (Exception e) {
+										Log.e("Read Error", e.toString());
+									}
+
+								} catch (Exception e) {
+									Log.e("Read Error", e.toString());
+								}
 							}
-							
-							Message message = loadContent.obtainMessage();
-							
-						
-							message.obj = response;
-							
-							loadContent.sendMessage(message);
-							
 						} catch (Exception e) {
 							e.printStackTrace();
 						}
-						
+
 					}
-				}
-			};
-			
-			getURL.start();
-			
-				
+				}, 0, 10000);
 			}
 		});
-    }
+	}
+	
+	
+   
 
     public boolean isNetworkActive(){
     		ConnectivityManager connMgr = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
